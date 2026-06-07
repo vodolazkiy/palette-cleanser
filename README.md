@@ -11,9 +11,7 @@ visual accessibility — pull requests and forks welcome.
 
 ## Try it live
 
-> _Link placeholder — set this to your GitHub Pages URL after enabling Pages on the repo._
->
-> `https://<your-handle>.github.io/palette-cleanser/`
+<https://vodolazkiy.github.io/palette-cleanser/>
 
 ## Screenshot
 
