@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Palette Cleanser — accessibility-first color palette generator</title>
+  <meta name="description" content="Generate color palettes that are checked against WCAG AA contrast and four forms of color vision deficiency, all client-side." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <h1>Palette Cleanser</h1>
+      <p class="tagline">Accessibility-first color palette generator. Runs entirely in your browser.</p>
+    </div>
+    <div class="header-controls">
+      <button id="toggle-theme" type="button" aria-pressed="false">Dark mode</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="inputs" aria-label="Brand color inputs">
+      <h2 class="sr-only">Inputs</h2>
+
+      <div class="input-group">
+        <label for="hex-primary">Primary <span class="required" aria-hidden="true">*</span></label>
+        <div class="input-row">
+          <input id="pick-primary" type="color" value="#3b82f6" aria-label="Primary color picker" />
+          <input id="hex-primary" type="text" inputmode="text" autocomplete="off" value="#3b82f6" pattern="#?[0-9a-fA-F]{3,6}" aria-describedby="primary-hint" />
+        </div>
+        <small id="primary-hint" class="hint">Required. Hex with or without #.</small>
+      </div>
+
+      <div class="input-group">
+        <label for="hex-secondary">Secondary <span class="optional">(optional anchor)</span></label>
+        <div class="input-row">
+          <input id="pick-secondary" type="color" value="#10b981" aria-label="Secondary color picker" />
+          <input id="hex-secondary" type="text" inputmode="text" autocomplete="off" value="" placeholder="(derived from harmony)" />
+          <button id="clear-secondary" type="button" class="clear-btn" aria-label="Clear secondary anchor">Clear</button>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="hex-accent">Accent <span class="optional">(optional anchor)</span></label>
+        <div class="input-row">
+          <input id="pick-accent" type="color" value="#f59e0b" aria-label="Accent color picker" />
+          <input id="hex-accent" type="text" inputmode="text" autocomplete="off" value="" placeholder="(derived from harmony)" />
+          <button id="clear-accent" type="button" class="clear-btn" aria-label="Clear accent anchor">Clear</button>
+        </div>
+      </div>
+
+      <div class="generate-row">
+        <button id="generate" type="button" class="primary-btn">Generate palettes</button>
+        <label class="cvd-toggle">
+          <input id="toggle-cvd" type="checkbox" checked />
+          Show color-vision-deficiency simulations
+        </label>
+      </div>
+    </section>
+
+    <section id="palettes" class="palette-grid" aria-live="polite" aria-label="Generated palettes"></section>
+
+    <section class="about">
+      <h2>How this works</h2>
+      <p>
+        Each palette is seeded from your primary color using a different harmony
+        strategy (analogous, complementary, triadic, split-complementary,
+        monochromatic) computed in <a href="https://bottosson.github.io/posts/oklab/">OKLCH</a>.
+        Neutrals are derived to harmonize with the brand hue; semantic colors
+        (success / warning / error) start from canonical hues and are
+        lightness-adjusted to pass <a href="https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html">WCAG 2.1 AA</a> contrast against the
+        background.
+      </p>
+      <p>
+        Color blindness simulations use the
+        <a href="http://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html">Machado et al. (2009)</a>
+        matrices for deuteranopia, protanopia, and tritanopia, applied in linear
+        RGB. Achromatopsia uses BT.709 luminance.
+      </p>
+      <p>
+        Colors are flagged if two roles become perceptually indistinguishable
+        under any simulation (ΔE in OKLab below a distinguishability threshold)
+        or if any required text/background pair fails AA. Anchored input colors
+        are never silently altered — only flagged.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>MIT-licensed · <a href="https://github.com/">View source</a> · No data leaves your browser.</p>
+  </footer>
+
+  <script type="module" src="js/ui.js"></script>
+</body>
+</html>

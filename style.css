@@ -1,0 +1,231 @@
+/* style.css — Palette Cleanser UI styles.
+   - Tool's own UI is accessibility-first: large focus rings, no color-only signaling,
+     respects prefers-reduced-motion, dark/light variants.
+   - Palette card visuals don't depend on the tool's theme — they're styled from
+     the inline CSS variables set per card so previews look identical in both modes. */
+
+:root {
+  --ui-bg: #fafafa;
+  --ui-surface: #ffffff;
+  --ui-text: #111827;
+  --ui-muted: #6b7280;
+  --ui-border: #e5e7eb;
+  --ui-accent: #2563eb;
+  --ui-focus: #fbbf24;
+  --ui-warn: #b45309;
+  --ui-ok: #047857;
+  --radius: 10px;
+}
+
+:root[data-theme="dark"] {
+  --ui-bg: #0b0d12;
+  --ui-surface: #151820;
+  --ui-text: #f3f4f6;
+  --ui-muted: #9ca3af;
+  --ui-border: #2a2f3a;
+  --ui-accent: #60a5fa;
+  --ui-focus: #fbbf24;
+  --ui-warn: #fbbf24;
+  --ui-ok: #34d399;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--ui-accent); }
+a:focus-visible, button:focus-visible, input:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ───────── Header ───────── */
+.site-header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--ui-border);
+}
+.site-header h1 { margin: 0; font-size: 1.6rem; }
+.tagline { margin: .25rem 0 0; color: var(--ui-muted); }
+.header-controls button {
+  padding: .5rem .9rem; background: var(--ui-surface); color: var(--ui-text);
+  border: 1px solid var(--ui-border); border-radius: var(--radius); cursor: pointer;
+}
+
+main { padding: 1.25rem 1.5rem 3rem; max-width: 1400px; margin: 0 auto; }
+
+/* ───────── Inputs ───────── */
+.inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+.input-group label { display: block; font-weight: 600; margin-bottom: .35rem; }
+.required { color: var(--ui-warn); }
+.optional { color: var(--ui-muted); font-weight: 400; font-size: .85rem; }
+.input-row { display: flex; gap: .5rem; align-items: center; }
+.input-row input[type="color"] {
+  width: 42px; height: 42px; padding: 0; border: 1px solid var(--ui-border);
+  background: transparent; border-radius: 8px; cursor: pointer;
+}
+.input-row input[type="text"] {
+  flex: 1; min-width: 0;
+  padding: .55rem .7rem; font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-bg); color: var(--ui-text);
+}
+.input-row input[type="text"][aria-invalid="true"] {
+  border-color: var(--ui-warn); background: color-mix(in srgb, var(--ui-warn) 8%, transparent);
+}
+.hint { color: var(--ui-muted); font-size: .8rem; }
+.clear-btn {
+  font-size: .8rem; padding: .3rem .55rem; background: transparent;
+  color: var(--ui-muted); border: 1px solid var(--ui-border); border-radius: 6px; cursor: pointer;
+}
+
+.generate-row {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
+}
+.primary-btn {
+  padding: .65rem 1.2rem; background: var(--ui-accent); color: white;
+  border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
+}
+.primary-btn:hover { filter: brightness(1.08); }
+.cvd-toggle { display: inline-flex; gap: .5rem; align-items: center; color: var(--ui-muted); }
+
+/* ───────── Palette grid + card ───────── */
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  /* per-card vars set inline from JS for accurate previews */
+}
+
+.card-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+.card-header h3 { margin: 0; font-size: 1.15rem; }
+.badge {
+  font-size: .8rem; padding: .25rem .6rem; border-radius: 999px;
+  border: 1px solid currentColor; white-space: nowrap;
+}
+.badge-ok { color: var(--ui-ok); }
+.badge-warn { color: var(--ui-warn); }
+
+/* ───────── Swatch rows ───────── */
+.swatch-rows { display: flex; flex-direction: column; gap: .35rem; }
+.swatch-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: .65rem;
+  align-items: center;
+}
+.swatch-row-label { font-size: .75rem; color: var(--ui-muted); }
+.swatch-strip { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; }
+.swatch {
+  position: relative;
+  min-height: 56px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 4px;
+  padding: 4px 5px;
+  cursor: pointer;
+  font-size: .65rem;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  display: flex; flex-direction: column; justify-content: space-between;
+  text-align: left;
+  overflow: hidden;
+}
+.swatch-role { font-weight: 600; text-transform: capitalize; }
+.swatch-hex { letter-spacing: -.02em; opacity: .85; }
+.swatch-anchor, .swatch-flag {
+  position: absolute; top: 2px; right: 3px; font-size: .7rem;
+  background: rgba(0,0,0,.35); color: white; border-radius: 3px;
+  padding: 0 3px; line-height: 1.2;
+}
+.swatch-flag { right: 3px; top: 2px; }
+.swatch-anchor { right: auto; left: 3px; }
+
+.swatch.copied::after {
+  content: "Copied!";
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: rgba(0,0,0,.7); color: white; border-radius: 3px;
+}
+
+/* ───────── Warnings ───────── */
+.warnings { background: var(--ui-bg); border-radius: 8px; padding: .75rem .9rem; }
+.warnings h4 { margin: 0 0 .4rem; font-size: .9rem; }
+.warnings-empty { margin: 0; color: var(--ui-ok); font-size: .9rem; }
+.warning-list { margin: 0; padding-left: 1.1rem; font-size: .85rem; }
+.warning-item { margin-bottom: .25rem; display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap; }
+.fix-btn {
+  font-size: .75rem; padding: .15rem .5rem; border-radius: 4px;
+  border: 1px solid var(--ui-accent); color: var(--ui-accent); background: transparent; cursor: pointer;
+}
+.anchor-note { color: var(--ui-muted); font-size: .75rem; }
+
+/* ───────── Preview ───────── */
+.preview {
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.preview-card {
+  padding: .9rem 1rem; border-radius: 8px;
+}
+.preview-text { margin: 0; font-weight: 600; }
+.preview-sub { margin: .15rem 0 .8rem; font-size: .85rem; }
+.preview-buttons { display: flex; gap: .5rem; margin-bottom: .7rem; flex-wrap: wrap; }
+.preview-btn, .preview-btn-secondary {
+  padding: .45rem .8rem; border-radius: 6px; cursor: pointer; font-weight: 500;
+  font: inherit; border: none;
+}
+.preview-alerts { display: flex; gap: .35rem; flex-wrap: wrap; }
+.preview-pill {
+  display: inline-block; padding: .2rem .55rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 600;
+}
+
+/* ───────── Exports ───────── */
+.export-row { display: flex; gap: .5rem; flex-wrap: wrap; }
+.export-btn {
+  font-size: .85rem; padding: .45rem .7rem;
+  border: 1px solid var(--ui-border); border-radius: 6px;
+  background: var(--ui-bg); color: var(--ui-text); cursor: pointer;
+}
+.export-btn.copied { border-color: var(--ui-ok); color: var(--ui-ok); }
+
+/* ───────── About / Footer ───────── */
+.about { margin-top: 2.5rem; max-width: 70ch; color: var(--ui-muted); }
+.about h2 { color: var(--ui-text); }
+.site-footer { padding: 1.25rem 1.5rem; border-top: 1px solid var(--ui-border); color: var(--ui-muted); font-size: .85rem; }
+
+/* ───────── Motion ───────── */
+@media (prefers-reduced-motion: no-preference) {
+  .swatch { transition: transform .08s ease; }
+  .swatch:hover { transform: translateY(-1px); }
+  .badge, .export-btn { transition: background .15s, border-color .15s, color .15s; }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "palette-cleanser",
+  "version": "0.1.0",
+  "description": "Accessibility-first color palette generator. Static site, runs entirely client-side.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serve": "node -e \"const s=require('http').createServer((q,r)=>{const p=require('path').join('.',q.url==='/'?'/index.html':q.url);require('fs').readFile(p,(e,d)=>{if(e){r.statusCode=404;r.end()}else{const t={'.html':'text/html','.css':'text/css','.js':'application/javascript','.svg':'image/svg+xml'}[require('path').extname(p)]||'text/plain';r.setHeader('Content-Type',t);r.end(d)}})});s.listen(8080,()=>console.log('http://localhost:8080'))\""
+  },
+  "license": "MIT"
+}
