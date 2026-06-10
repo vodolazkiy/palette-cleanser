@@ -9,6 +9,7 @@ import {
   suggestFix, contrastRatio,
 } from "./engine.js";
 import { CVD_TYPES, CVD_LABELS, makeCvdTransform, simulateHex } from "./cvd.js";
+import { openPicker, initPicker } from "./colorpicker.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State
@@ -39,21 +40,35 @@ document.addEventListener("DOMContentLoaded", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function wireInputs() {
+  initPicker();
   for (const role of ["primary", "secondary", "accent"]) {
-    const picker = document.getElementById(`pick-${role}`);
+    const trigger = document.getElementById(`trigger-${role}`);
     const text = document.getElementById(`hex-${role}`);
     const clear = document.getElementById(`clear-${role}`);
 
-    // Two-way bind picker ↔ text.
-    picker.addEventListener("input", () => {
-      text.value = picker.value;
-      state[role] = picker.value;
+    // Single source of truth: update the trigger's swatch background, the text
+    // field, and the state record from one place.
+    const applyHex = (hex) => {
+      trigger.style.background = hex;
+      text.value = hex;
+      state[role] = hex;
       flashValidity(text, true);
+    };
+
+    // The trigger opens our custom popover picker instead of the native dialog.
+    trigger.addEventListener("click", () => {
+      const initial = state[role] || normalizeHex(text.value) || trigger.style.background || "#3b82f6";
+      openPicker({
+        anchorEl: trigger,
+        initialHex: initial,
+        onChange: applyHex,
+      });
     });
+
     text.addEventListener("input", () => {
       const norm = normalizeHex(text.value);
       if (norm) {
-        picker.value = norm;
+        trigger.style.background = norm;
         state[role] = norm;
         flashValidity(text, true);
       } else if (text.value.trim() === "" && role !== "primary") {

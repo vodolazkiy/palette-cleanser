@@ -209,6 +209,34 @@ test("validatePalette: a sensible blue-seeded palette passes text/bg AA", () => 
   );
 });
 
+test("ensureContrast preserves hue: dark-green seed against white doesn't collapse to black", () => {
+  // Regression: the previous implementation overrode the binary-search result
+  // with whichever extreme (L=0 or L=1) had the highest contrast, which meant
+  // every dark-on-light role ended up #000000 regardless of its hue.
+  const greenSeed = hexToOklch("#22c55e"); // tailwind green-500
+  const adjusted = ensureContrast(greenSeed, { r: 1, g: 1, b: 1 }, WCAG_AA_NORMAL);
+  assert.ok(adjusted.passed, "should hit AA against white");
+  // The OKLCH chroma must remain > 0 — a fully achromatic result is pure black.
+  assert.ok(adjusted.oklch.C > 0.05, `chroma collapsed: ${JSON.stringify(adjusted.oklch)}`);
+  // And the L should be > 0 — we only pushed as far as needed.
+  assert.ok(adjusted.oklch.L > 0.05, `L collapsed to extreme: ${adjusted.oklch.L}`);
+});
+
+test("light-mode palette: semantic colors keep hue identity (not black)", () => {
+  // Light mode bg is near-white, so success/warning/error must darken to pass
+  // AA — but they should remain identifiably green/amber/red.
+  const p = generatePalette({ primary: hexToOklch("#3b82f6"), strategy: "analogous" });
+  for (const role of ["success", "warning", "error"]) {
+    const rgb = hexToRgb(p.colors[role]);
+    // None of these should be pure black or near-black across all channels.
+    const maxChannel = Math.max(rgb.r, rgb.g, rgb.b);
+    assert.ok(maxChannel > 0.15, `${role} collapsed to near-black: ${p.colors[role]}`);
+    // And r/g/b shouldn't all be equal (would mean achromatic).
+    const isAchromatic = Math.abs(rgb.r - rgb.g) < 0.02 && Math.abs(rgb.g - rgb.b) < 0.02;
+    assert.ok(!isAchromatic, `${role} lost its hue: ${p.colors[role]}`);
+  }
+});
+
 test("dark-mode palette: 'Button label on primary' picks the high-contrast neutral, not always background", () => {
   // In dark mode the background neutral is dark; using it as a button label
   // on a bright primary would fail. The validator should select `text` (the

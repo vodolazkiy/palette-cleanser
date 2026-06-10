@@ -224,37 +224,47 @@ export const HARMONY_LABELS = {
 
 /** Adjust an OKLCH color's L until it has at least `target` contrast against
  *  the reference sRGB color. Direction: brighter or darker, whichever is needed
- *  given the reference's luminance. Returns the adjusted OKLCH, or the closest
- *  reachable approximation if AA can't be hit within [0,1] lightness. */
+ *  given the reference's luminance.
+ *
+ *  Returns the L value *closest to the seed* that still passes — i.e., the
+ *  minimum perturbation. We never push past the point of passing in pursuit of
+ *  even higher contrast: doing so would collapse every "needs to be dark
+ *  enough" color to pure black, destroying the hue identity (a green success
+ *  pill becomes #000). If no L in [0,1] reaches the target, returns the
+ *  extreme value with `passed: false` so callers can warn the user.
+ *
+ *  Parametrize the search by t ∈ [0,1] where t=0 keeps seed.L and t=1 pushes
+ *  to the extreme (0 if the reference is light, 1 if it's dark). Find the
+ *  smallest t whose contrast ≥ target. */
 export function ensureContrast(seedOklch, referenceRgb, target = WCAG_AA_NORMAL) {
-  const refL = relativeLuminance(referenceRgb);
-  const goDarker = refL > 0.5;
-  let lo = goDarker ? 0 : seedOklch.L;
-  let hi = goDarker ? seedOklch.L : 1;
-  let best = { ...seedOklch };
-  let bestRatio = contrastRatio(oklchToRgb(seedOklch), referenceRgb);
+  const seedRgb = oklchToRgb(seedOklch);
+  const seedRatio = contrastRatio(seedRgb, referenceRgb);
+  if (seedRatio >= target) {
+    return { oklch: { ...seedOklch }, ratio: seedRatio, passed: true };
+  }
 
-  // Binary search for the minimum lightness change that achieves the target.
-  for (let i = 0; i < 28; i++) {
+  const extreme = relativeLuminance(referenceRgb) > 0.5 ? 0 : 1;
+  const at = (t) => {
+    const L = seedOklch.L * (1 - t) + extreme * t;
+    const oklch = { ...seedOklch, L };
+    return { oklch, ratio: contrastRatio(oklchToRgb(oklch), referenceRgb) };
+  };
+
+  // If even t=1 can't reach the target, return the extreme as a best-effort
+  // fallback. Callers will see passed:false and surface a warning.
+  const extremeResult = at(1);
+  if (extremeResult.ratio < target) {
+    return { ...extremeResult, passed: false };
+  }
+
+  // Bisect for the smallest t that reaches `target`. Invariant: at(lo) fails,
+  // at(hi) passes. We start with at(0) (seed) failing and at(1) passing.
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 32; i++) {
     const mid = (lo + hi) / 2;
-    const candidate = { ...seedOklch, L: mid };
-    const ratio = contrastRatio(oklchToRgb(candidate), referenceRgb);
-    if (ratio > bestRatio) { best = candidate; bestRatio = ratio; }
-    if (ratio >= target) {
-      // Reached target; tighten toward seed.L to preserve original lightness.
-      if (goDarker) lo = mid; else hi = mid;
-    } else {
-      if (goDarker) hi = mid; else lo = mid;
-    }
+    if (at(mid).ratio >= target) hi = mid; else lo = mid;
   }
-  // Final sweep: if binary search didn't find AA within [0,1], step lightness
-  // to the extreme and keep whichever side maximizes contrast.
-  for (const Lcand of [0, 0.02, 0.05, 0.95, 0.98, 1]) {
-    const cand = { ...seedOklch, L: Lcand };
-    const r = contrastRatio(oklchToRgb(cand), referenceRgb);
-    if (r > bestRatio) { best = cand; bestRatio = r; }
-  }
-  return { oklch: best, ratio: bestRatio, passed: bestRatio >= target };
+  return { ...at(hi), passed: true };
 }
 
 /** Build a neutral ramp (background, surface, text) tinted with the seed hue.
