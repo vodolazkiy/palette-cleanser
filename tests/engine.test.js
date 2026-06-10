@@ -208,3 +208,20 @@ test("validatePalette: a sensible blue-seeded palette passes text/bg AA", () => 
     `body/surface should pass but failed: ${failingLabels.join(", ")}`,
   );
 });
+
+test("dark-mode palette: 'Button label on primary' picks the high-contrast neutral, not always background", () => {
+  // In dark mode the background neutral is dark; using it as a button label
+  // on a bright primary would fail. The validator should select `text` (the
+  // light neutral) as the foreground instead, and that pair should pass.
+  const p = generatePalette({
+    primary: hexToOklch("#3b82f6"),
+    strategy: "analogous",
+    dark: true,
+  });
+  const r = validatePalette(p);
+  const buttonFailure = r.contrastFailures.find((f) => f.label === "Button label on primary");
+  assert.equal(
+    buttonFailure, undefined,
+    `dark palette should pass "Button label on primary" by selecting the right fg; got ratio ${buttonFailure?.ratio}`,
+  );
+});

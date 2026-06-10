@@ -145,67 +145,145 @@ function renderCard(palette) {
   card.style.setProperty("--card-surface", palette.colors.surface);
   card.style.setProperty("--card-text", palette.colors.text);
 
-  const report = validatePalette(palette);
+  const issues = computeIssues(palette);
+
+  card.appendChild(renderHeader(palette, issues));
+  card.appendChild(renderBody(palette, issues));
+  card.appendChild(renderWarnings(palette, issues));
+  card.appendChild(renderExportRow(palette, issues));
+  return card;
+}
+
+/**
+ * Compute the deduped issue list for one palette.
+ *
+ * - Contrast failures are deduped by their `label` — if "Body text on background"
+ *   fails in true color, we don't repeat it for every CVD type. We only surface
+ *   a CVD-specific contrast failure if it isn't already a true-color failure.
+ * - Collisions are grouped by role pair, so "primary and accent collide" under
+ *   deuteranopia + protanopia becomes a single item listing both contexts.
+ */
+function computeIssues(palette) {
+  const trueReport = validatePalette(palette);
   const cvdReports = {};
   for (const type of CVD_TYPES) {
     cvdReports[type] = validateUnderTransform(palette, makeCvdTransform(type));
   }
 
-  card.appendChild(renderHeader(palette, report, cvdReports));
-  card.appendChild(renderSwatchRows(palette, report, cvdReports));
-  card.appendChild(renderWarnings(palette, report, cvdReports));
-  card.appendChild(renderPreview(palette));
-  card.appendChild(renderExportRow(palette, report, cvdReports));
-  return card;
+  const items = [];
+  const seenContrastLabels = new Set();
+
+  for (const f of trueReport.contrastFailures) {
+    items.push({
+      kind: "contrast",
+      contexts: ["True color"],
+      label: f.label,
+      ratio: f.ratio,
+      target: f.target,
+      fg: f.fg,
+      bg: f.bg,
+      anchored: f.anchored,
+      failure: f,
+    });
+    seenContrastLabels.add(f.label);
+  }
+  for (const type of CVD_TYPES) {
+    const ctx = cvdShortLabel(type);
+    for (const f of cvdReports[type].contrastFailures) {
+      if (seenContrastLabels.has(f.label)) continue;
+      items.push({
+        kind: "contrast",
+        contexts: [ctx],
+        label: f.label,
+        ratio: f.ratio,
+        target: f.target,
+        fg: f.fg,
+        bg: f.bg,
+        anchored: f.anchored,
+        failure: f,
+      });
+      seenContrastLabels.add(f.label);
+    }
+  }
+
+  // Collisions grouped by unordered role pair.
+  const collisionByPair = new Map();
+  const addCollision = (c, ctx) => {
+    const key = [c.roleA, c.roleB].sort().join("|");
+    const entry = collisionByPair.get(key) ?? {
+      kind: "collision", roleA: c.roleA, roleB: c.roleB,
+      contexts: [], minDeltaE: Infinity,
+    };
+    entry.contexts.push(ctx);
+    entry.minDeltaE = Math.min(entry.minDeltaE, c.deltaE);
+    collisionByPair.set(key, entry);
+  };
+  for (const c of trueReport.collisions) addCollision(c, "True color");
+  for (const type of CVD_TYPES) {
+    const ctx = cvdShortLabel(type);
+    for (const c of cvdReports[type].collisions) addCollision(c, ctx);
+  }
+  for (const entry of collisionByPair.values()) items.push(entry);
+
+  // Roles flagged anywhere — used to badge swatches in the true-color row.
+  const flaggedRoles = new Set();
+  for (const it of items) {
+    if (it.kind === "contrast") { flaggedRoles.add(it.fg); flaggedRoles.add(it.bg); }
+    else { flaggedRoles.add(it.roleA); flaggedRoles.add(it.roleB); }
+  }
+
+  return { items, flaggedRoles, cvdReports };
 }
 
-function renderHeader(palette, report, cvdReports) {
-  const totalWarnings =
-    report.contrastFailures.length +
-    report.collisions.length +
-    Object.values(cvdReports).reduce(
-      (sum, r) => sum + r.contrastFailures.length + r.collisions.length,
-      0,
-    );
+const cvdShortLabel = (type) => CVD_LABELS[type].split(" (")[0];
+
+function renderHeader(palette, issues) {
+  const total = issues.items.length;
   const header = el("header", { className: "card-header" });
   const title = el("h3", { textContent: palette.label });
   const badge = el("span", { className: "badge" });
-  if (totalWarnings === 0) {
+  if (total === 0) {
     badge.classList.add("badge-ok");
     badge.textContent = "✓ CVD-safe";
   } else {
     badge.classList.add("badge-warn");
-    badge.textContent = `⚠ ${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`;
+    badge.textContent = `⚠ ${total} issue${total === 1 ? "" : "s"}`;
   }
-  badge.setAttribute("aria-label", `${totalWarnings} accessibility warnings`);
+  badge.setAttribute("aria-label", `${total} accessibility issues`);
   header.append(title, badge);
   return header;
 }
 
-function renderSwatchRows(palette, report, cvdReports) {
+/** The card body — swatch rows on the left, mini-preview on the right (on
+ *  wide screens). Stacks vertically on narrow viewports via CSS. */
+function renderBody(palette, issues) {
+  const body = el("div", { className: "card-body" });
+  body.appendChild(renderSwatchRows(palette, issues));
+  body.appendChild(renderPreview(palette));
+  return body;
+}
+
+function renderSwatchRows(palette, issues) {
   const wrap = el("div", { className: "swatch-rows" });
-  wrap.appendChild(renderSwatchRow(palette.colors, "True color", report, palette));
+  wrap.appendChild(renderSwatchRow(palette.colors, "True color", issues.flaggedRoles, palette));
   if (state.showCvd) {
     for (const type of CVD_TYPES) {
       const transformed = {};
       for (const role of ROLES) {
         transformed[role] = simulateHex(type, palette.colors[role]);
       }
-      wrap.appendChild(renderSwatchRow(transformed, CVD_LABELS[type], cvdReports[type], palette));
+      // CVD rows don't repeat the true-color swatch flags; only the true-color
+      // row carries the ⚠ icons. The CVD rows are about visual comparison.
+      wrap.appendChild(renderSwatchRow(transformed, cvdShortLabel(type), null, palette));
     }
   }
   return wrap;
 }
 
-function renderSwatchRow(colors, label, report, palette) {
+function renderSwatchRow(colors, label, flaggedRoles, palette) {
   const row = el("div", { className: "swatch-row" });
   row.appendChild(el("div", { className: "swatch-row-label", textContent: label }));
   const strip = el("div", { className: "swatch-strip", role: "list" });
-
-  // Flagged roles get an icon. Build a set of affected roles from this report.
-  const flaggedRoles = new Set();
-  for (const f of report.contrastFailures) { flaggedRoles.add(f.fg); flaggedRoles.add(f.bg); }
-  for (const c of report.collisions) { flaggedRoles.add(c.roleA); flaggedRoles.add(c.roleB); }
 
   for (const role of ROLES) {
     const hex = colors[role];
@@ -228,8 +306,8 @@ function renderSwatchRow(colors, label, report, palette) {
       const lock = el("span", { className: "swatch-anchor", textContent: "🔒", "aria-label": "user-anchored — won't be altered" });
       sw.appendChild(lock);
     }
-    if (flaggedRoles.has(role)) {
-      const flag = el("span", { className: "swatch-flag", textContent: "⚠", "aria-label": "has an accessibility warning in this row" });
+    if (flaggedRoles && flaggedRoles.has(role)) {
+      const flag = el("span", { className: "swatch-flag", textContent: "⚠", "aria-label": "involved in an accessibility issue" });
       sw.appendChild(flag);
     }
     sw.addEventListener("click", () => copyToClipboard(hex, sw));
@@ -239,38 +317,25 @@ function renderSwatchRow(colors, label, report, palette) {
   return row;
 }
 
-function renderWarnings(palette, report, cvdReports) {
+function renderWarnings(palette, issues) {
   const wrap = el("div", { className: "warnings" });
-  const items = [];
 
-  for (const f of report.contrastFailures) items.push(formatContrastFailure(f, "true color"));
-  for (const c of report.collisions)        items.push(formatCollision(c, "true color"));
-  for (const type of CVD_TYPES) {
-    const r = cvdReports[type];
-    const ctx = CVD_LABELS[type].split(" (")[0];
-    for (const f of r.contrastFailures) items.push(formatContrastFailure(f, ctx));
-    for (const c of r.collisions)        items.push(formatCollision(c, ctx));
-  }
-
-  if (items.length === 0) {
+  if (issues.items.length === 0) {
     wrap.appendChild(el("p", { className: "warnings-empty", textContent: "No accessibility issues detected." }));
     return wrap;
   }
 
-  const heading = el("h4", { textContent: "Issues" });
-  wrap.appendChild(heading);
+  wrap.appendChild(el("h4", { textContent: "Issues" }));
   const list = el("ul", { className: "warning-list" });
-  for (const item of items) {
+  for (const item of issues.items) {
     const li = el("li", { className: "warning-item" });
-    const msg = el("span", { textContent: item.text });
-    li.appendChild(msg);
-    if (item.fixable && item.failure) {
+    li.appendChild(el("span", { textContent: formatIssueText(item) }));
+    if (item.kind === "contrast" && !item.anchored) {
       const fixBtn = el("button", { className: "fix-btn", type: "button", textContent: "Try fix" });
       fixBtn.addEventListener("click", () => applyFix(palette, item.failure));
       li.appendChild(fixBtn);
-    } else if (item.anchorBlocked) {
-      const note = el("span", { className: "anchor-note", textContent: "(user-anchored)" });
-      li.appendChild(note);
+    } else if (item.kind === "contrast" && item.anchored) {
+      li.appendChild(el("span", { className: "anchor-note", textContent: "(user-anchored)" }));
     }
     list.appendChild(li);
   }
@@ -278,22 +343,15 @@ function renderWarnings(palette, report, cvdReports) {
   return wrap;
 }
 
-function formatContrastFailure(f, context) {
-  const ratioStr = f.ratio.toFixed(2);
-  const targetStr = f.target.toFixed(1);
-  return {
-    text: `${context}: ${f.label} has ${ratioStr}:1 contrast (needs ${targetStr}:1).`,
-    fixable: !f.anchored,
-    failure: f,
-    anchorBlocked: f.anchored,
-  };
-}
-
-function formatCollision(c, context) {
-  return {
-    text: `${context}: ${c.roleA} and ${c.roleB} are nearly indistinguishable (ΔE ${c.deltaE.toFixed(3)}).`,
-    fixable: false, // collision auto-fix is non-trivial; we report only
-  };
+/** Render one issue item to a human-readable string. Contexts (true color +
+ *  any CVD types) are joined so a collision affecting multiple simulations
+ *  reads as a single line. */
+function formatIssueText(item) {
+  const ctxStr = item.contexts.join(" / ");
+  if (item.kind === "contrast") {
+    return `${ctxStr} — ${item.label}: ${item.ratio.toFixed(2)}:1 (needs ${item.target.toFixed(1)}:1).`;
+  }
+  return `${ctxStr} — ${item.roleA} and ${item.roleB} are nearly indistinguishable (ΔE ${item.minDeltaE.toFixed(3)}).`;
 }
 
 function applyFix(palette, failure) {
@@ -328,14 +386,12 @@ function renderPreview(palette) {
   return preview;
 }
 
-function renderExportRow(palette, report, cvdReports) {
+function renderExportRow(palette, issues) {
   const row = el("div", { className: "export-row" });
-  const totalWarnings =
-    report.contrastFailures.length + report.collisions.length +
-    Object.values(cvdReports).reduce((s, r) => s + r.contrastFailures.length + r.collisions.length, 0);
-  const status = totalWarnings === 0
+  const total = issues.items.length;
+  const status = total === 0
     ? "Validation: passes WCAG AA and CVD distinguishability."
-    : `Validation: ${totalWarnings} warning${totalWarnings === 1 ? "" : "s"} — review before shipping.`;
+    : `Validation: ${total} issue${total === 1 ? "" : "s"} — review before shipping.`;
 
   for (const [label, fn] of [
     ["Tailwind", exportTailwind],

@@ -358,15 +358,21 @@ export function generateCandidates({ primary, secondary, accent, dark = false })
 // Returns a structured report consumed by the UI.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Text/background pairs that we require to pass WCAG AA. */
+/** Text/background pairs that we require to pass WCAG AA. `fg` may be either
+ *  a single role or an array — when it's an array, validation picks whichever
+ *  candidate role yields the highest contrast against the background. This
+ *  models the real-world "on-primary" / "on-surface" design-token pattern,
+ *  where a button label is whichever neutral reads best on the button color.
+ *  Without this, dark-mode palettes always fail "text on primary button" since
+ *  the background neutral is dark and unreadable against a bright primary. */
 export const REQUIRED_CONTRAST_PAIRS = [
-  { fg: "text",      bg: "background", target: WCAG_AA_NORMAL, label: "Body text on background" },
-  { fg: "text",      bg: "surface",    target: WCAG_AA_NORMAL, label: "Body text on surface" },
-  { fg: "primary",   bg: "background", target: WCAG_AA_LARGE,  label: "Primary on background (large)" },
-  { fg: "background", bg: "primary",   target: WCAG_AA_NORMAL, label: "Text on primary button" },
-  { fg: "background", bg: "success",   target: WCAG_AA_NORMAL, label: "Text on success" },
-  { fg: "background", bg: "warning",   target: WCAG_AA_NORMAL, label: "Text on warning" },
-  { fg: "background", bg: "error",     target: WCAG_AA_NORMAL, label: "Text on error" },
+  { fg: "text",                bg: "background", target: WCAG_AA_NORMAL, label: "Body text on background" },
+  { fg: "text",                bg: "surface",    target: WCAG_AA_NORMAL, label: "Body text on surface" },
+  { fg: "primary",             bg: "background", target: WCAG_AA_LARGE,  label: "Primary on background (large)" },
+  { fg: ["text", "background"], bg: "primary",   target: WCAG_AA_NORMAL, label: "Button label on primary" },
+  { fg: ["text", "background"], bg: "success",   target: WCAG_AA_NORMAL, label: "Text on success" },
+  { fg: ["text", "background"], bg: "warning",   target: WCAG_AA_NORMAL, label: "Text on warning" },
+  { fg: ["text", "background"], bg: "error",     target: WCAG_AA_NORMAL, label: "Text on error" },
 ];
 
 /** Role pairs whose CVD simulations must remain perceptually distinct. We omit
@@ -396,13 +402,25 @@ export function validateUnderTransform(palette, transform) {
 
   const contrastFailures = [];
   for (const pair of REQUIRED_CONTRAST_PAIRS) {
-    const ratio = contrastRatio(rgb(pair.fg), rgb(pair.bg));
-    if (ratio < pair.target) {
+    // fg may be a single role or an array of candidate roles. Pick whichever
+    // candidate has the highest contrast against bg — that's the foreground
+    // a real component would use.
+    const fgRoles = Array.isArray(pair.fg) ? pair.fg : [pair.fg];
+    let bestFg = fgRoles[0];
+    let bestRatio = -Infinity;
+    for (const candidate of fgRoles) {
+      const r = contrastRatio(rgb(candidate), rgb(pair.bg));
+      if (r > bestRatio) { bestRatio = r; bestFg = candidate; }
+    }
+    if (bestRatio < pair.target) {
       contrastFailures.push({
-        ...pair,
-        ratio,
+        label: pair.label,
+        target: pair.target,
+        fg: bestFg,
+        bg: pair.bg,
+        ratio: bestRatio,
         // Whether the failure is caused by a user anchor we can't auto-fix.
-        anchored: palette.anchors[pair.fg] || palette.anchors[pair.bg],
+        anchored: palette.anchors[bestFg] || palette.anchors[pair.bg],
       });
     }
   }

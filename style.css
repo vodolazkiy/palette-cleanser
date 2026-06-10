@@ -109,20 +109,36 @@ main { padding: 1.25rem 1.5rem 3rem; max-width: 1400px; margin: 0 auto; }
 .primary-btn:hover { filter: brightness(1.08); }
 .cvd-toggle { display: inline-flex; gap: .5rem; align-items: center; color: var(--ui-muted); }
 
-/* ───────── Palette grid + card ───────── */
+/* ───────── Palette grid + card ─────────
+   One palette per row — three across made the swatches cramped and the labels
+   unreadable. On very wide displays we allow two-up so power users can compare. */
 .palette-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 1700px) {
+  .palette-grid { grid-template-columns: 1fr 1fr; }
 }
 
 .card {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   border-radius: var(--radius);
-  padding: 1.25rem;
-  display: flex; flex-direction: column; gap: 1rem;
-  /* per-card vars set inline from JS for accurate previews */
+  padding: 1.5rem;
+  display: flex; flex-direction: column; gap: 1.1rem;
+}
+
+/* Body splits swatch rows from the live preview side-by-side on wide cards.
+   On narrow viewports the preview drops below the swatches via media query. */
+.card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .card-body { grid-template-columns: 1fr; }
 }
 
 .card-header {
@@ -137,42 +153,70 @@ main { padding: 1.25rem 1.5rem 3rem; max-width: 1400px; margin: 0 auto; }
 .badge-warn { color: var(--ui-warn); }
 
 /* ───────── Swatch rows ───────── */
-.swatch-rows { display: flex; flex-direction: column; gap: .35rem; }
+.swatch-rows { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
 .swatch-row {
   display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: .65rem;
-  align-items: center;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: .75rem;
+  align-items: stretch;
 }
-.swatch-row-label { font-size: .75rem; color: var(--ui-muted); }
-.swatch-strip { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; }
+.swatch-row-label {
+  font-size: .8rem; color: var(--ui-muted);
+  align-self: center;
+}
+.swatch-strip {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px;
+}
 .swatch {
   position: relative;
-  min-height: 56px;
+  min-height: 72px;
   border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-  border-radius: 4px;
-  padding: 4px 5px;
+  border-radius: 6px;
+  padding: 8px 8px 7px;
   cursor: pointer;
-  font-size: .65rem;
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
   display: flex; flex-direction: column; justify-content: space-between;
   text-align: left;
   overflow: hidden;
+  min-width: 0;
 }
-.swatch-role { font-weight: 600; text-transform: capitalize; }
-.swatch-hex { letter-spacing: -.02em; opacity: .85; }
+.swatch-role {
+  font-weight: 600;
+  text-transform: capitalize;
+  font-size: .78rem;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.swatch-hex {
+  font-size: .72rem;
+  letter-spacing: -.02em;
+  opacity: .82;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* CVD rows can be shorter — they're for visual comparison, not selection. */
+.swatch-row + .swatch-row .swatch { min-height: 44px; padding: 5px 7px 4px; }
+.swatch-row + .swatch-row .swatch-role { font-size: .68rem; }
+.swatch-row + .swatch-row .swatch-hex { font-size: .65rem; }
+
 .swatch-anchor, .swatch-flag {
-  position: absolute; top: 2px; right: 3px; font-size: .7rem;
-  background: rgba(0,0,0,.35); color: white; border-radius: 3px;
-  padding: 0 3px; line-height: 1.2;
+  position: absolute; top: 3px; font-size: .65rem;
+  background: rgba(0,0,0,.45); color: white; border-radius: 3px;
+  padding: 1px 4px; line-height: 1.2;
 }
-.swatch-flag { right: 3px; top: 2px; }
-.swatch-anchor { right: auto; left: 3px; }
+.swatch-flag { right: 3px; }
+.swatch-anchor { left: 3px; }
 
 .swatch.copied::after {
   content: "Copied!";
   position: absolute; inset: 0; display: grid; place-items: center;
-  background: rgba(0,0,0,.7); color: white; border-radius: 3px;
+  background: rgba(0,0,0,.7); color: white; border-radius: 4px;
+  font-size: .75rem;
 }
 
 /* ───────── Warnings ───────── */
@@ -187,14 +231,17 @@ main { padding: 1.25rem 1.5rem 3rem; max-width: 1400px; margin: 0 auto; }
 }
 .anchor-note { color: var(--ui-muted); font-size: .75rem; }
 
-/* ───────── Preview ───────── */
+/* ───────── Preview ─────────
+   Sits to the right of the swatch rows inside .card-body. Width is fixed
+   (~280px) by the grid template so the preview reads as a focused sample. */
 .preview {
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   padding: 1rem;
+  align-self: start;
 }
 .preview-card {
-  padding: .9rem 1rem; border-radius: 8px;
+  padding: 1rem 1.1rem; border-radius: 8px;
 }
 .preview-text { margin: 0; font-weight: 600; }
 .preview-sub { margin: .15rem 0 .8rem; font-size: .85rem; }
